@@ -1,0 +1,59 @@
+@import "version.inc" ;
+@import "outercurve.inc" ;
+@import "defines.inc";
+
+package {
+    name: "${pkg-name}-dev-common";
+    version: "${package-version}";
+    arch: any;
+    display-name: "${display-name} Dev Library-common";
+}
+
+metadata {
+    summary: "${display-name} developer library (common)";
+    description: "${product-description}";
+    icon: "${pkg-name}.png"; 
+    author-version : "${author-version}";
+    bug-tracker: "https://github.com/coapp-packages/${pkg-name}/issues";
+    stability : "0";
+    licenses : {
+        GPL
+    };
+}
+
+files[headers] {
+    root: @"..\FL";
+
+    include: {
+        "*",
+    };
+    
+    trim-path:all;
+    
+    destination:"FL";
+}
+
+/* skip this for now, need doxygen to generate docs
+files[docs] {
+    root: @"..\doc\";
+    include: {
+        "*"
+    };
+    
+    trim-path:all;
+    
+    destination-path:"docs";
+
+}
+*/
+
+developer-library[${pkg-name}] {
+    headers: { 
+        headers
+    };
+   /* 
+    docs: {
+        docs
+    };
+    */
+}

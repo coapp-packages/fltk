@@ -1,0 +1,160 @@
+/* target information */
+@import "version.inc";
+
+#product-info  {
+	product-name: "fltk";
+	version: "1.3.0";
+	original-source-location: "http://www.fltk.org/software.php?VERSION=1.3.0&FILE=fltk/1.3.0/fltk-1.3.0-source.tar.gz";
+	original-source-website: "http://www.fltk.org";
+	license: "Modified GPL";
+	packager: "Hamish C";
+}
+
+test {
+    set: {
+        COMPILERS="${COMPILERS??vc10}";
+        PLAT="${PLAT??x86,x64}";
+    };
+
+    default : false;
+    uses: release;
+    build-command: @"
+	    for %%A in (${COMPILERS}) do (
+            for %%B in (${PLAT}) do (
+                call :testroutine ""%%A"" ""%%B""
+            )
+        )
+        goto :eof
+
+:testroutine
+        pushd ide\%~1\output\%~2\Release\bin\
+        
+        rem do tests here
+
+        goto passed
+:failed
+        echo ""Test(s) failed for (%~1,%~2)""
+:passed
+        popd
+        goto :eof
+    ";
+};
+
+package {
+    set: COMP="${COMP??vc10}";
+    set: PLAT="${PLAT??x86, x64}";
+    default : false;
+    uses : sign;
+    
+    targets: { 
+        @"COPKG\fltk[vc10]-${package-version}-x86.msi",
+        @"COPKG\fltk-dev[vc10]-${package-version}-x86.msi",
+        @"COPKG\fltk-dev-common-${package-version}-any.msi",
+        @"COPKG\fltk[vc10]-${package-version}-x64.msi",
+        @"COPKG\fltk-dev[vc10]-${package-version}-x64.msi"
+    };
+    
+    build-command : @"
+        pushd COPKG
+        autopackage fltk-dev-common.autopkg || goto failed
+        
+        for %%A in (${COMP}) do (
+            for %%B in (${PLAT}) do (
+                autopackage --COMP=%%A --PLAT=%%B fltk.autopkg fltk-dev.autopkg || goto failed
+            )
+        )
+        popd
+        ptk update-version
+    ";
+
+	clean-command: @"del COPKG\*.msi COPKG\*.wixpdb";
+};
+
+update-version {
+    default : false;
+    
+    build-command : @"
+        REM auto-increment version.inc file...
+        
+        pushd COPKG
+        setlocal EnableDelayedExpansion
+        for /F ""tokens=4,5,6,7  delims=.; "" %%v in (version.inc) do (
+            set /a build=%%y + 1
+            set VERSTRING=#define { package-version: %%v.%%w.%%x.!build!; }
+        )
+        echo !VERSTRING! > version.inc
+        popd
+    ";
+}
+
+release {
+    set: {
+        COMPILERS="${COMPILERS??vc10}";
+        PLAT="${PLAT??x86, x64}";
+        CONFIG="Release";
+    };
+
+    build-command: @"
+        for %%A in (${COMPILERS}) do (
+            for %%B in (${PLAT}) do (
+			    ptk -nologo base --CONFIG=${CONFIG} --COMP=%%A --PLAT=%%B
+		    )
+        )
+    ";
+};
+
+sign {
+    default : false;
+    uses: release;
+    build-command: @"simplesigner.exe --nologo --sign ide\**.dll ide\**.exe";
+};
+
+x86 {
+    set: PLAT=x86;
+    uses: base;
+};
+
+x64 {
+    set: PLAT=x64;
+    uses: base;
+};
+
+base {
+    set: {
+        CONFIG="${CONFIG??Release}";
+        COMP="${COMP??vc10}";
+        PLAT="${PLAT??x86}";
+    };
+
+    compiler:"${COMP}";
+    platform:"${PLAT}";
+
+    targets: { 
+		"ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fltkdll.dll",
+        "ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fltkdll.lib",
+        "ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fltk.lib",
+        "ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fltkforms.lib",
+        "ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fltkgl.lib",
+        "ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fltkimages.lib",
+        "ide\${COMP}\output\${PLAT}\${CONFIG}\bin\fluid.exe",
+	};
+	
+    build-command:@"
+        if ""${PLAT}"" == ""x86"" (
+            msbuild /p:Platform=win32 /p:Configuration=${CONFIG} ide\${COMP}\fltk.sln
+        ) else (
+            msbuild /p:Platform=${PLAT} /p:Configuration=${CONFIG} ide\${COMP}\fltk.sln
+        )
+	";
+    
+    clean-command:@"
+        if ""${PLAT}"" == ""x86"" (
+            msbuild /p:Platform=win32 /p:Configuration=${CONFIG} /target:Clean ide\${COMP}\fltk.sln
+        ) else (
+            msbuild /p:Platform=${PLAT} /p:Configuration=${CONFIG} /target:Clean ide\${COMP}\fltk.sln
+        )
+
+        if exist ide\${COMP}\output rmdir /s /q ide\${COMP}\output > nul 2> nul
+        del /S /Q /A - *.sdf *.suo *.user *.exe *.pdb > nul 2>NUL
+    ";
+};
